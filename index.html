@@ -3,114 +3,193 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>My Tapper</title>
+    <title>My Leveled Tapper</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
-            background-color: #000;
+            background-color: #1a1a1a; /* Чуть светлее фон */
             color: white;
-            font-family: Arial, sans-serif;
+            font-family: 'Arial', sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
             margin: 0;
-            overflow: hidden; /* Чтобы не скроллилось при частых тапах */
+            overflow: hidden;
+            user-select: none; /* Запрет выделения текста */
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .level-text {
+            font-size: 18px;
+            color: #ffd700;
+            margin-bottom: 10px;
         }
 
         .score-container {
             font-size: 48px;
-            font-weight: bold;
-            margin-bottom: 50px;
+            font-weight: 800;
+        }
+
+        .character-container {
+            position: relative;
+            width: 280px;
+            height: 280px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         .character {
-            width: 250px;
-            height: 250px;
-            background-image: url('https://cdn-icons-png.flaticon.com/512/4712/4712109.png'); /* Ссылка на картинку (хомяк или монетка) */
+            width: 100%;
+            height: 100%;
+            /* Начальная картинка будет установлена через JS */
             background-size: cover;
-            border-radius: 50%;
+            background-position: center;
+            border-radius: 20px; /* Скруглим углы, так как картинки квадратные */
             cursor: pointer;
-            transition: transform 0.1s;
-            box-shadow: 0 0 50px rgba(255, 215, 0, 0.3);
-            -webkit-tap-highlight-color: transparent; /* Убирает синий квадрат при нажатии на мобильных */
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Пружинящая анимация */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            -webkit-tap-highlight-color: transparent;
+            z-index: 2;
         }
 
         .character:active {
-            transform: scale(0.95); /* Эффект нажатия */
+            transform: scale(0.93); /* Эффект нажатия */
         }
 
-        /* Анимация вылетающих цифр */
+        /* Крутое свечение за персонажем */
+        .glow {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 20px;
+            background: radial-gradient(circle, rgba(255,215,0,0.4) 0%, rgba(0,0,0,0) 70%);
+            z-index: 1;
+            pointer-events: none;
+        }
+
         .float-text {
             position: absolute;
-            color: #ffd700;
-            font-size: 24px;
+            color: #ffffff;
+            text-shadow: 0 0 5px #ffd700;
+            font-size: 28px;
             font-weight: bold;
             pointer-events: none;
-            animation: floatUp 1s ease-out forwards;
+            animation: floatUp 0.8s ease-out forwards;
+            z-index: 10;
         }
 
         @keyframes floatUp {
-            0% { opacity: 1; transform: translateY(0); }
-            100% { opacity: 0; transform: translateY(-100px); }
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-120px) scale(1.2); }
         }
     </style>
 </head>
 <body>
 
-    <div class="score-container">
-        <span id="score">0</span>
+    <div class="header">
+        <div class="level-text" id="levelLabel">Уровень 1</div>
+        <div class="score-container">
+            <span id="score">0</span>
+        </div>
     </div>
 
-    <div class="character" id="clickBtn"></div>
+    <div class="character-container">
+        <div class="glow"></div>
+        <div class="character" id="clickBtn"></div>
+    </div>
 
     <script>
-        // Инициализация Telegram Web App
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Разворачиваем на весь экран
+        tg.expand();
 
-        // Логика игры
+        // === НАСТРОЙКА КАРТИНОК ===
+        // ВАЖНО: Замени эти ссылки на свои прямые ссылки на загруженные картинки!
+        const levelImages = {
+            1: https://github.com/Vladiklegend/-/blob/main/photo_2025-12-29_23-57-27.jpg
+            2: https://github.com/Vladiklegend/-/blob/main/photo_2025-12-29_23-57-24.jpg
+            3: https://github.com/Vladiklegend/-/blob/main/photo_2025-12-29_23-57-14.jpg
+        };
+        // ==========================
+
         let score = 0;
+        let currentLevel = 1;
         const scoreElement = document.getElementById('score');
+        const levelLabelElement = document.getElementById('levelLabel');
         const clickArea = document.getElementById('clickBtn');
 
-        // Попробуем загрузить сохраненный счет (локально)
+        // Загрузка сохраненного счета
         if (localStorage.getItem('myScore')) {
             score = parseInt(localStorage.getItem('myScore'));
             scoreElement.innerText = score;
         }
 
-        clickArea.addEventListener('click', (e) => {
-            // 1. Увеличиваем счет
-            score++;
-            scoreElement.innerText = score;
-            localStorage.setItem('myScore', score); // Сохраняем прогресс
+        // Функция проверки и обновления уровня
+        function checkAndUpdateLevel() {
+            let newLevel = 1;
 
-            // 2. Вибрация (Haptic Feedback) - очень важно для ощущений!
-            if (tg.HapticFeedback) {
-                tg.HapticFeedback.impactOccurred('medium');
+            if (score >= 1000) {
+                newLevel = 3;
+            } else if (score >= 100) {
+                newLevel = 2;
+            } else {
+                newLevel = 1;
             }
 
-            // 3. Визуальный эффект (+1)
+            // Если уровень изменился или это первая загрузка
+            if (newLevel !== currentLevel || !clickArea.style.backgroundImage) {
+                currentLevel = newLevel;
+                // Меняем картинку
+                clickArea.style.backgroundImage = `url('${levelImages[currentLevel]}')`;
+                // Меняем текст уровня
+                levelLabelElement.innerText = `Уровень ${currentLevel}`;
+                
+                // Дополнительная вибрация при повышении уровня, если это не старт игры
+                if (score > 0 && tg.HapticFeedback) {
+                     tg.HapticFeedback.notificationOccurred('success');
+                }
+            }
+        }
+
+        // Вызываем проверку уровня при запуске
+        checkAndUpdateLevel();
+
+        clickArea.addEventListener('click', (e) => {
+            // Увеличиваем счет
+            score++;
+            scoreElement.innerText = score;
+            localStorage.setItem('myScore', score);
+
+            // Проверяем, не пора ли сменить уровень
+            checkAndUpdateLevel();
+
+            // Вибрация
+            if (tg.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('light');
+            }
+
+            // Анимация +1
             const floatText = document.createElement('div');
             floatText.classList.add('float-text');
-            floatText.innerText = '+1';
+            floatText.innerText = `+${currentLevel}`; // Даем монеток в зависимости от уровня (по желанию)
             
-            // Позиционируем цифру там, где был клик
             const rect = clickArea.getBoundingClientRect();
-            // Немного рандома для красоты
-            const randomX = (Math.random() - 0.5) * 40; 
+            const randomX = (Math.random() - 0.5) * 60; 
             
-            floatText.style.left = `${e.clientX}px`;
-            floatText.style.top = `${e.clientY}px`;
+            floatText.style.left = `${e.clientX - 20}px`; // Центрируем относительно клика
+            floatText.style.top = `${e.clientY - 40}px`;
             
             document.body.appendChild(floatText);
 
-            // Удаляем элемент после анимации
             setTimeout(() => {
                 floatText.remove();
-            }, 1000);
+            }, 800);
         });
     </script>
 </body>
