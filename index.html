@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>My Tapper</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            background-color: #000;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Чтобы не скроллилось при частых тапах */
+        }
+
+        .score-container {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 50px;
+        }
+
+        .character {
+            width: 250px;
+            height: 250px;
+            background-image: url('https://cdn-icons-png.flaticon.com/512/4712/4712109.png'); /* Ссылка на картинку (хомяк или монетка) */
+            background-size: cover;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.1s;
+            box-shadow: 0 0 50px rgba(255, 215, 0, 0.3);
+            -webkit-tap-highlight-color: transparent; /* Убирает синий квадрат при нажатии на мобильных */
+        }
+
+        .character:active {
+            transform: scale(0.95); /* Эффект нажатия */
+        }
+
+        /* Анимация вылетающих цифр */
+        .float-text {
+            position: absolute;
+            color: #ffd700;
+            font-size: 24px;
+            font-weight: bold;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-100px); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="score-container">
+        <span id="score">0</span>
+    </div>
+
+    <div class="character" id="clickBtn"></div>
+
+    <script>
+        // Инициализация Telegram Web App
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Разворачиваем на весь экран
+
+        // Логика игры
+        let score = 0;
+        const scoreElement = document.getElementById('score');
+        const clickArea = document.getElementById('clickBtn');
+
+        // Попробуем загрузить сохраненный счет (локально)
+        if (localStorage.getItem('myScore')) {
+            score = parseInt(localStorage.getItem('myScore'));
+            scoreElement.innerText = score;
+        }
+
+        clickArea.addEventListener('click', (e) => {
+            // 1. Увеличиваем счет
+            score++;
+            scoreElement.innerText = score;
+            localStorage.setItem('myScore', score); // Сохраняем прогресс
+
+            // 2. Вибрация (Haptic Feedback) - очень важно для ощущений!
+            if (tg.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('medium');
+            }
+
+            // 3. Визуальный эффект (+1)
+            const floatText = document.createElement('div');
+            floatText.classList.add('float-text');
+            floatText.innerText = '+1';
+            
+            // Позиционируем цифру там, где был клик
+            const rect = clickArea.getBoundingClientRect();
+            // Немного рандома для красоты
+            const randomX = (Math.random() - 0.5) * 40; 
+            
+            floatText.style.left = `${e.clientX}px`;
+            floatText.style.top = `${e.clientY}px`;
+            
+            document.body.appendChild(floatText);
+
+            // Удаляем элемент после анимации
+            setTimeout(() => {
+                floatText.remove();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
